@@ -12,7 +12,7 @@
  * tracks the active light/dark theme automatically.
  */
 import { LitElement, css, html, type CSSResultGroup, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 
 /** The custom element tag for the alt/az sky dial. */
 const SKY_DIAL_TAG = 'seestar-sky-dial';
@@ -65,7 +65,6 @@ function normalizeDegrees(degrees: number): number {
  * `altitude`/`azimuth` are the raw degrees from the scope; the component clamps
  * altitude to `[0, 90]` and wraps azimuth into `[0, 360)` before plotting.
  */
-@customElement(SKY_DIAL_TAG)
 export class SeestarSkyDial extends LitElement {
   /** Altitude in degrees above the horizon; clamped to `[0, 90]`. */
   @property({ type: Number }) public altitude = 0;
@@ -261,4 +260,9 @@ declare global {
   interface HTMLElementTagNameMap {
     [SKY_DIAL_TAG]: SeestarSkyDial;
   }
+}
+
+// Guard against a double-load re-defining the element (see seestar-card.ts).
+if (!customElements.get(SKY_DIAL_TAG)) {
+  customElements.define(SKY_DIAL_TAG, SeestarSkyDial);
 }

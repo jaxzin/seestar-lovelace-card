@@ -12,7 +12,7 @@
  * tracks the active light/dark theme automatically.
  */
 import { LitElement, css, html, nothing, svg, type CSSResultGroup, type SVGTemplateResult, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 
 /** The custom element tag for the stacking progress ring. */
 const STACK_RING_TAG = 'seestar-stack-ring';
@@ -63,7 +63,6 @@ interface Tick {
  * Inputs are the raw counts plus already-formatted `exposure`/`integration`
  * strings (the card owns unit formatting); the component only draws them.
  */
-@customElement(STACK_RING_TAG)
 export class SeestarStackRing extends LitElement {
   /** Frames successfully stacked so far. */
   @property({ type: Number }) public stacked = 0;
@@ -216,4 +215,9 @@ declare global {
   interface HTMLElementTagNameMap {
     [STACK_RING_TAG]: SeestarStackRing;
   }
+}
+
+// Guard against a double-load re-defining the element (see seestar-card.ts).
+if (!customElements.get(STACK_RING_TAG)) {
+  customElements.define(STACK_RING_TAG, SeestarStackRing);
 }

@@ -14,7 +14,7 @@
  * the active light/dark theme automatically.
  */
 import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { property, state } from 'lit/decorators.js';
 import { resolve } from './entities.js';
 import { deriveDisplaySession, EMPTY_VALUE, type ActionModel, type ActionTone, type DisplaySession } from './modes.js';
 import { haIconName } from './components/index.js';
@@ -71,7 +71,6 @@ const ACTION_COLORS: Readonly<Record<ActionTone, ActionColors>> = {
  * states are card-local (`@state`) — arming is off by default for safety, and
  * the Saved/Live toggle defaults to Saved.
  */
-@customElement(CARD_TAG)
 export class SeestarCard extends LitElement implements LovelaceCard {
   /** Injected by Home Assistant on every state change. */
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -161,7 +160,7 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       font-family: 'Roboto Mono', ui-monospace, monospace;
       font-size: 9.5px;
       letter-spacing: 0.05em;
-      color: rgba(255, 255, 255, 0.32);
+      color: rgba(255, 255, 255, 0.5);
       z-index: 1;
     }
     .scrim-top {
@@ -169,7 +168,7 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       left: 0;
       right: 0;
       top: 0;
-      height: 58px;
+      height: 60px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent);
       pointer-events: none;
     }
@@ -178,7 +177,7 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       left: 0;
       right: 0;
       bottom: 0;
-      height: 92px;
+      height: 96px;
       background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent);
       pointer-events: none;
     }
@@ -196,6 +195,7 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       backdrop-filter: blur(6px);
     }
     .source-toggle button {
+      position: relative;
       border: none;
       cursor: pointer;
       height: 26px;
@@ -208,10 +208,25 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       align-items: center;
       gap: 5px;
     }
+    /* a11y: extend the pressable target to >=36px without growing the 26px pill */
+    .source-toggle button::after {
+      content: '';
+      position: absolute;
+      top: -5px;
+      bottom: -5px;
+      left: 0;
+      right: 0;
+    }
     .source-toggle ha-icon {
       --mdc-icon-size: 14px;
       width: 14px;
       height: 14px;
+    }
+    /* Live glyph reads 15px in the design; Saved stays 14px. */
+    .source-toggle button.live-source ha-icon {
+      --mdc-icon-size: 15px;
+      width: 15px;
+      height: 15px;
     }
     .source-toggle button.active {
       background: rgba(255, 255, 255, 0.92);
@@ -425,6 +440,15 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       outline: 2px solid var(--primary-color);
       outline-offset: 2px;
     }
+    /* a11y: extend the pressable target to >=36px without growing the 40x23 pill */
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: -6.5px;
+      bottom: -6.5px;
+      left: 0;
+      right: 0;
+    }
     .switch .knob {
       position: absolute;
       top: 2.5px;
@@ -560,8 +584,8 @@ export class SeestarCard extends LitElement implements LovelaceCard {
         <div class="scrim-bottom"></div>
 
         <div class="source-toggle" role="group" aria-label="Image source">
-          ${this.renderSourceButton('mdi:image-outline', 'Saved', !this.live, this.showSaved)}
-          ${this.renderSourceButton('mdi:video-outline', 'Live', this.live, this.showLive)}
+          ${this.renderSourceButton('mdi:image-outline', 'Saved', !this.live, this.showSaved, false)}
+          ${this.renderSourceButton('mdi:video-outline', 'Live', this.live, this.showLive, true)}
         </div>
 
         <div class="badge">
@@ -578,13 +602,15 @@ export class SeestarCard extends LitElement implements LovelaceCard {
   }
 
   /** One Saved/Live segmented-toggle button. */
-  private renderSourceButton(icon: string, label: string, active: boolean, onClick: () => void): TemplateResult {
-    return html`<button
-      type="button"
-      class=${active ? 'active' : 'inactive'}
-      aria-pressed=${active}
-      @click=${onClick}
-    >
+  private renderSourceButton(
+    icon: string,
+    label: string,
+    active: boolean,
+    onClick: () => void,
+    isLiveSource: boolean,
+  ): TemplateResult {
+    const classes = `${active ? 'active' : 'inactive'}${isLiveSource ? ' live-source' : ''}`;
+    return html`<button type="button" class=${classes} aria-pressed=${active} @click=${onClick}>
       <ha-icon icon=${icon} aria-hidden="true"></ha-icon>${label}
     </button>`;
   }
@@ -749,10 +775,12 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     const config = this.actionConfig(action.key);
     const configured = config?.service !== undefined;
     const colors = ACTION_COLORS[action.tone];
+    // The primary tone reads 0 15px in the design; every other tone is 0 14px.
+    const paddingX = action.tone === 'primary' ? '15px' : '14px';
     return html`
       <button
         type="button"
-        style=${`background:${colors.bg};color:${colors.fg};`}
+        style=${`background:${colors.bg};color:${colors.fg};padding:0 ${paddingX};`}
         ?disabled=${!configured}
         aria-disabled=${!configured}
         title=${configured ? action.label : 'configure this action'}
@@ -788,6 +816,13 @@ declare global {
   interface HTMLElementTagNameMap {
     [CARD_TAG]: SeestarCard;
   }
+}
+
+// Guard the definition so a double-load of the bundle (a re-registered HACS
+// resource, a dashboard reload without a full page refresh) can't throw
+// `NotSupportedError` and take down every card on the page.
+if (!customElements.get(CARD_TAG)) {
+  customElements.define(CARD_TAG, SeestarCard);
 }
 
 // Register in the Lovelace card picker so users can add the card from the UI.

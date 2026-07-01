@@ -12,7 +12,7 @@
  * bundle, while still styling itself entirely from HA theme variables.
  */
 import { LitElement, css, html, type CSSResultGroup, type TemplateResult } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { property, state } from 'lit/decorators.js';
 import type { HomeAssistant, SeestarCardConfig } from './types.js';
 
 /** The editor's custom element tag. */
@@ -36,7 +36,6 @@ interface ConfigChangedDetail {
  * contract); `config` holds the working config, mutated per field and
  * re-emitted on every change.
  */
-@customElement(EDITOR_TAG)
 export class SeestarCardEditor extends LitElement {
   /** Injected by Home Assistant; part of the editor contract. */
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -63,7 +62,7 @@ export class SeestarCardEditor extends LitElement {
       padding: 0 12px;
       border-radius: 8px;
       border: 1px solid var(--divider-color);
-      background: var(--card-background-color, #fff);
+      background: var(--card-background-color, var(--ha-card-background, var(--secondary-background-color)));
       color: var(--primary-text-color);
       font-family: inherit;
       font-size: 14px;
@@ -181,4 +180,9 @@ declare global {
   interface HTMLElementTagNameMap {
     [EDITOR_TAG]: SeestarCardEditor;
   }
+}
+
+// Guard against a double-load re-defining the element (see seestar-card.ts).
+if (!customElements.get(EDITOR_TAG)) {
+  customElements.define(EDITOR_TAG, SeestarCardEditor);
 }

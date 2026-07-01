@@ -14,7 +14,7 @@
  * `<ha-icon>`, so no external icon font is bundled.
  */
 import { LitElement, css, html, type CSSResultGroup, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 import { haIconName } from './icon.js';
 
 /** The custom element tag for the stat item. */
@@ -48,7 +48,6 @@ const VALUE_COLORS: Readonly<Record<StatItemTone, string>> = {
  * `value` and `unit` are pre-formatted strings (the card owns unit formatting);
  * the component only lays them out and applies the tone colours.
  */
-@customElement(STAT_ITEM_TAG)
 export class SeestarStatItem extends LitElement {
   /** MDI icon, e.g. `mdi:thermometer`, `mdi-thermometer` or `thermometer`. */
   @property({ type: String }) public icon = 'mdi:circle-medium';
@@ -188,4 +187,9 @@ declare global {
   interface HTMLElementTagNameMap {
     [STAT_ITEM_TAG]: SeestarStatItem;
   }
+}
+
+// Guard against a double-load re-defining the element (see seestar-card.ts).
+if (!customElements.get(STAT_ITEM_TAG)) {
+  customElements.define(STAT_ITEM_TAG, SeestarStatItem);
 }

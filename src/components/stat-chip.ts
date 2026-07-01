@@ -12,7 +12,7 @@
  * external icon font is bundled.
  */
 import { LitElement, css, html, type CSSResultGroup, type TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 import { haIconName } from './icon.js';
 
 /** The custom element tag for the status chip. */
@@ -78,7 +78,6 @@ const TONE_COLORS: Readonly<Record<StatChipTone, ToneColors>> = {
  * `icon` accepts either an MDI slug (`sync`), the design's `mdi-sync` class-name
  * form, or the `mdi:sync` form; all normalise to the `<ha-icon>` `mdi:` scheme.
  */
-@customElement(STAT_CHIP_TAG)
 export class SeestarStatChip extends LitElement {
   /** MDI icon, e.g. `mdi:sync`, `mdi-sync` or `sync`. */
   @property({ type: String }) public icon = 'mdi:circle-medium';
@@ -133,4 +132,9 @@ declare global {
   interface HTMLElementTagNameMap {
     [STAT_CHIP_TAG]: SeestarStatChip;
   }
+}
+
+// Guard against a double-load re-defining the element (see seestar-card.ts).
+if (!customElements.get(STAT_CHIP_TAG)) {
+  customElements.define(STAT_CHIP_TAG, SeestarStatChip);
 }
