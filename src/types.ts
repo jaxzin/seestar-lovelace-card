@@ -80,6 +80,12 @@ export interface SeestarCardConfig {
   readonly name?: string;
   /** Optional accent colour override; defaults to `--primary-color`. */
   readonly accent?: string;
+  /**
+   * Optional explicit hero camera `entity_id`. When omitted the card
+   * auto-resolves `camera.<device>_live_stacked_preview`, falling back to the
+   * older `camera.<device>_live_preview` if that's what HA registered.
+   */
+  readonly camera_entity?: string;
   /** Optional map of named actions → service calls for scope controls. */
   readonly actions?: Record<string, ActionConfig>;
 }

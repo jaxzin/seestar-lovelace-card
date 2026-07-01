@@ -796,7 +796,7 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     if (config === undefined || hass === undefined) {
       return nothing;
     }
-    const display = deriveDisplaySession(resolve(hass, config.device));
+    const display = deriveDisplaySession(resolve(hass, config.device, config.camera_entity));
     const accentStyle = config.accent !== undefined ? `--seestar-accent:${config.accent};--primary-color:${config.accent};` : undefined;
     return html`
       <ha-card style=${accentStyle ?? nothing}>

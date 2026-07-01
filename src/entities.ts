@@ -128,9 +128,36 @@ function booleanValue(hass: HomeAssistant, prefix: string, key: BinarySensorKey)
   return isLive(entity) ? entity.state === BINARY_ON : undefined;
 }
 
+/**
+ * Camera entity_id candidates for the hero, newest name first. HA assigns an
+ * entity_id from the entity NAME at a unique_id's FIRST registration and keeps
+ * it thereafter — so a scope first seen under an older bridge ("Live preview")
+ * stays `live_preview` even after the bridge renames it to "Live stacked
+ * preview". Try both so the hero works regardless of which bridge registered it.
+ */
+const CAMERA_FALLBACK_KEYS = ['live_stacked_preview', 'live_preview'] as const;
+
+/**
+ * Resolve the hero camera's entity_id: an explicit config override, else the
+ * first candidate that actually exists in `hass.states`, else the default name
+ * (so the field is always a string; the view shows a placeholder if absent).
+ */
+function resolveCameraEntityId(hass: HomeAssistant, prefix: string, override?: string): string {
+  if (override) {
+    return override;
+  }
+  for (const key of CAMERA_FALLBACK_KEYS) {
+    const id = `camera.${prefix}_${key}`;
+    if (hass.states[id]) {
+      return id;
+    }
+  }
+  return `camera.${prefix}_${CAMERA_FALLBACK_KEYS[0]}`;
+}
+
 /** A camera entity's `entity_picture` attribute URL, when the feed is live. */
-function cameraPicture(hass: HomeAssistant, prefix: string, key: CameraKey): string | undefined {
-  const entity = stateOf(hass, entityId('camera', prefix, key));
+function pictureForEntity(hass: HomeAssistant, cameraEntityId: string): string | undefined {
+  const entity = stateOf(hass, cameraEntityId);
   if (!isLive(entity)) {
     return undefined;
   }
@@ -231,13 +258,14 @@ export interface SeestarSession {
  * collapse to `undefined`, so callers never see the literal strings
  * `"unavailable"`/`"unknown"` or `NaN`.
  */
-export function resolve(hass: HomeAssistant, prefix: string): SeestarSession {
-  const { sensor, camera } = ENTITY_KEYS;
+export function resolve(hass: HomeAssistant, prefix: string, cameraOverride?: string): SeestarSession {
+  const { sensor } = ENTITY_KEYS;
+  const cameraEntityId = resolveCameraEntityId(hass, prefix, cameraOverride);
   return {
     prefix,
     preview: {
-      cameraEntityId: entityId('camera', prefix, camera.livePreview),
-      picture: cameraPicture(hass, prefix, camera.livePreview),
+      cameraEntityId,
+      picture: pictureForEntity(hass, cameraEntityId),
     },
     target: {
       telephotoTarget: sensorValue(hass, prefix, sensor.telephotoTarget),
