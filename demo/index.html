@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Seestar Card — demo</title>
+
+    <!--
+      Standalone fidelity harness for OUR verification (not shipped).
+
+      It imports the built card bundle, stubs the two Home Assistant frontend
+      elements the card relies on (`ha-card`, `ha-icon`), and mounts three
+      mock scopes — stargazing / solar / scenery — from the design's sample
+      data, side by side in a light and a dark themed wrapper so the mode
+      adaptation and theming can be eyeballed against the design.
+
+      Run: `npm run build`, then open this file in a browser.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet" />
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Roboto, system-ui, sans-serif;
+        background: #e9ebef;
+        color: #26303f;
+        padding: 40px;
+      }
+      h1 {
+        font-size: 24px;
+        font-weight: 700;
+        margin: 0 0 4px;
+      }
+      p.lead {
+        margin: 0 0 28px;
+        color: #586072;
+        max-width: 760px;
+      }
+      .themes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        align-items: flex-start;
+      }
+      .theme {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 20px;
+        border-radius: 20px;
+      }
+      .theme h2 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .cards {
+        display: flex;
+        gap: 18px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .card-slot {
+        width: 340px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card-slot .caption {
+        font-size: 12px;
+        font-weight: 500;
+        opacity: 0.75;
+      }
+
+      /* ---- light theme tokens ---- */
+      .theme-light {
+        background: #f3f4f6;
+        --primary-color: #03a9f4;
+        --primary-text-color: #212121;
+        --secondary-text-color: #727274;
+        --disabled-text-color: #b0b0b0;
+        --card-background-color: #ffffff;
+        --primary-background-color: #f3f4f6;
+        --secondary-background-color: #eceef1;
+        --divider-color: rgba(0, 0, 0, 0.12);
+        --state-icon-color: #44739e;
+        --success-color: #2e7d32;
+        --warning-color: #ef6c00;
+        --error-color: #d93f33;
+        --ha-card-border-color: rgba(0, 0, 0, 0.06);
+        --ha-card-border-radius: 12px;
+        --ha-card-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        color: #26303f;
+      }
+      .theme-light h2 {
+        color: #33405a;
+      }
+
+      /* ---- dark theme tokens ---- */
+      .theme-dark {
+        background: #111317;
+        --primary-color: #03a9f4;
+        --primary-text-color: #e1e1e1;
+        --secondary-text-color: #9b9b9b;
+        --disabled-text-color: #6f6f6f;
+        --card-background-color: #1c1c1c;
+        --primary-background-color: #111317;
+        --secondary-background-color: #2a2c30;
+        --divider-color: rgba(225, 228, 234, 0.13);
+        --state-icon-color: #a6c0db;
+        --success-color: #66bb6a;
+        --warning-color: #ffa726;
+        --error-color: #ef5350;
+        --ha-card-border-color: rgba(255, 255, 255, 0.08);
+        --ha-card-border-radius: 12px;
+        --ha-card-box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        color: #e1e1e1;
+      }
+      .theme-dark h2 {
+        color: #cdd3dd;
+      }
+
+      /* stub ha-icon renders the MDI font glyph */
+      ha-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Seestar Card — fidelity demo</h1>
+    <p class="lead">
+      The built <code>seestar-card</code> mounted against three mock scopes (stargazing / solar / scenery) from the
+      design's sample data, in light and dark themes. Toggle <b>Saved / Live</b> on the hero and <b>Arm</b> to reveal
+      the wired action buttons.
+    </p>
+
+    <div class="themes">
+      <div class="theme theme-light">
+        <h2>Light theme</h2>
+        <div class="cards" data-theme="light"></div>
+      </div>
+      <div class="theme theme-dark">
+        <h2>Dark theme</h2>
+        <div class="cards" data-theme="dark"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      // ---- Stub the two HA frontend elements the card depends on ----
+      // `ha-card`: a themed surface wrapper.
+      if (!customElements.get('ha-card')) {
+        class HaCard extends HTMLElement {
+          connectedCallback() {
+            this.style.display = 'block';
+          }
+        }
+        customElements.define('ha-card', HaCard);
+      }
+      // `ha-icon`: renders the MDI web-font glyph for an `mdi:<name>` icon.
+      if (!customElements.get('ha-icon')) {
+        class HaIcon extends HTMLElement {
+          static get observedAttributes() {
+            return ['icon'];
+          }
+          connectedCallback() {
+            this._render();
+          }
+          attributeChangedCallback() {
+            this._render();
+          }
+          _render() {
+            const icon = (this.getAttribute('icon') || '').replace(/^mdi:/, 'mdi-');
+            const size = getComputedStyle(this).getPropertyValue('--mdc-icon-size') || '18px';
+            this.innerHTML = `<span class="mdi ${icon}" style="font-size:${size.trim()};line-height:1;"></span>`;
+          }
+        }
+        customElements.define('ha-icon', HaIcon);
+      }
+
+      // Cache-bust the bundle on every load so rebuilds show up on refresh.
+      await import(`../dist/seestar-card.js?ts=${Date.now()}`);
+
+      // ---- Mock hass: a `states` map the card resolves per device prefix ----
+      // Entity ids follow the bridge contract: `<component>.<prefix>_<slug>`.
+      const attr = (extra = {}) => ({ friendly_name: '', ...extra });
+      const sensor = (prefix, slug, state) => [`sensor.${prefix}_${slug}`, { entity_id: `sensor.${prefix}_${slug}`, state: String(state), attributes: attr() }];
+      const binary = (prefix, slug, on) => [`binary_sensor.${prefix}_${slug}`, { entity_id: `binary_sensor.${prefix}_${slug}`, state: on ? 'on' : 'off', attributes: attr() }];
+
+      // Build a states map for one mock scope from a flat spec.
+      function scopeStates(prefix, spec) {
+        const entries = [];
+        for (const [slug, value] of Object.entries(spec.sensors)) {
+          entries.push(sensor(prefix, slug, value));
+        }
+        for (const [slug, on] of Object.entries(spec.binaries)) {
+          entries.push(binary(prefix, slug, on));
+        }
+        return Object.fromEntries(entries);
+      }
+
+      // Design sample data → entity-state specs.
+      const SCOPES = {
+        stargazing: {
+          prefix: 'stargazing',
+          sensors: {
+            telephoto_mode: 'star',
+            telephoto_target: 'NGC 7000',
+            stacked_frames: 318,
+            total_frames: 480,
+            dropped_frames: 9,
+            exposure: 10,
+            integration_time: 53,
+            altitude: 47,
+            azimuth: 71,
+            mount_mode: 'EQ',
+            catalog_objects: 'NGC 7000, IC 5070, IC 5068',
+            battery: 61,
+            sensor_temperature: -1.2,
+            storage_used: 38,
+          },
+          binaries: { plan_running: true, tracking: true, dew_heater: true },
+        },
+        solar: {
+          prefix: 'solar',
+          sensors: {
+            telephoto_mode: 'sun',
+            telephoto_target: 'Sun',
+            stacked_frames: 612,
+            total_frames: 1000,
+            dropped_frames: 47,
+            exposure: 0.005,
+            integration_time: 0.05,
+            altitude: 61,
+            azimuth: 196,
+            mount_mode: 'Alt-Az',
+            catalog_objects: 'AR4123, AR4126',
+            battery: 84,
+            sensor_temperature: 31.4,
+            storage_used: 42,
+          },
+          binaries: { plan_running: true, tracking: true },
+        },
+        scenery: {
+          prefix: 'scenery',
+          sensors: {
+            telephoto_mode: 'scenery',
+            wide_field_target: 'Scenery',
+            exposure: 0.00833,
+            battery: 92,
+            sensor_temperature: 27.8,
+            storage_used: 42,
+          },
+          binaries: { plan_running: false, tracking: false },
+        },
+      };
+
+      const states = {};
+      for (const spec of Object.values(SCOPES)) {
+        Object.assign(states, scopeStates(spec.prefix, spec));
+      }
+
+      const hass = {
+        states,
+        callService(domain, service, data) {
+          // eslint-disable-next-line no-console
+          console.log('callService', domain, service, data);
+          return Promise.resolve();
+        },
+      };
+
+      // Wire an example action set so the armed buttons are enabled in the demo.
+      const actions = {
+        stop_session: { service: 'telescope.stop' },
+        start_session: { service: 'telescope.start' },
+        pause_plan: { service: 'telescope.pause' },
+        goto: { service: 'telescope.goto' },
+        park: { service: 'telescope.park' },
+        capture: { service: 'camera.snapshot' },
+      };
+
+      const LABELS = { stargazing: '2A · Stargazing', solar: '2C · Solar', scenery: '2D · Scenery (adapts most)' };
+
+      function mount(container, prefix, caption) {
+        const slot = document.createElement('div');
+        slot.className = 'card-slot';
+        const cap = document.createElement('div');
+        cap.className = 'caption';
+        cap.textContent = caption;
+        const card = document.createElement('seestar-card');
+        card.setConfig({ type: 'custom:seestar-card', device: prefix, actions });
+        card.hass = hass;
+        slot.append(cap, card);
+        container.append(slot);
+      }
+
+      for (const themeEl of document.querySelectorAll('.cards')) {
+        for (const [key, spec] of Object.entries(SCOPES)) {
+          mount(themeEl, spec.prefix, LABELS[key]);
+        }
+      }
+    </script>
+  </body>
+</html>
