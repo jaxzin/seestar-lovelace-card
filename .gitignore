@@ -1,0 +1,5 @@
+# dependencies
+node_modules/
+
+# build metadata (dist/seestar-card.js is committed for HACS)
+*.tsbuildinfo

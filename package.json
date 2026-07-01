@@ -1,0 +1,24 @@
+{
+  "name": "seestar-lovelace-card",
+  "version": "0.1.0",
+  "description": "Home Assistant custom Lovelace card for the Seestar S30 Pro bridge.",
+  "author": "Brian R. Jackson",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/seestar-card.js",
+  "scripts": {
+    "build": "rollup -c",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lit": "^3"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15",
+    "@rollup/plugin-terser": "^0.4",
+    "@rollup/plugin-typescript": "^11",
+    "rollup": "^4",
+    "tslib": "^2",
+    "typescript": "^5"
+  }
+}
