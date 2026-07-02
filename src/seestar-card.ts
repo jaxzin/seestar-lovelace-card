@@ -182,6 +182,19 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       color: rgba(255, 255, 255, 0.5);
       z-index: 1;
     }
+    .hero-media {
+      position: absolute;
+      inset: 0;
+      cursor: pointer;
+      padding: 0;
+      border: none;
+      background: none;
+      display: block;
+    }
+    .hero-media:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: -2px;
+    }
     .scrim-top {
       position: absolute;
       left: 0;
@@ -295,6 +308,8 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       bottom: 12px;
       right: 15px;
       color: #fff;
+      /* non-interactive overlay: let clicks fall through to the hero media */
+      pointer-events: none;
     }
     .hero-target {
       font-size: 19px;
@@ -559,6 +574,22 @@ export class SeestarCard extends LitElement implements LovelaceCard {
   }
 
   /**
+   * Open HA's more-info dialog (the full-size camera view) for whichever
+   * source the hero is showing: Saved -> the stacked-preview camera,
+   * Live -> the live-view camera.
+   */
+  private openHeroMoreInfo(display: DisplaySession): void {
+    const entityId = this.live ? display.liveCameraEntityId : display.cameraEntityId;
+    this.dispatchEvent(
+      new CustomEvent('hass-more-info', {
+        detail: { entityId },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /**
    * Run a configured HA action by key. No-op when unconfigured (the button is
    * disabled anyway); otherwise dispatches `hass.callService(domain, service)`
    * with the config's data payload.
@@ -622,9 +653,18 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     const sourceLabel =
       display.badge === 'stacking' ? 'STACKED' : display.badge === 'idle' ? 'IDLE' : 'LIVE';
     const label = `${targetText} · ${sourceLabel}`;
+    const mediaLabel = this.live ? 'Open the live view camera' : 'Open the stacked preview camera';
     return html`
       <div class="hero">
-        ${image !== undefined ? this.renderHeroImage(image, targetText) : this.renderHeroPlaceholder(display, label)}
+        <button
+          type="button"
+          class="hero-media"
+          aria-label=${mediaLabel}
+          title=${mediaLabel}
+          @click=${() => this.openHeroMoreInfo(display)}
+        >
+          ${image !== undefined ? this.renderHeroImage(image, targetText) : this.renderHeroPlaceholder(display, label)}
+        </button>
         <div class="scrim-top"></div>
         <div class="scrim-bottom"></div>
 

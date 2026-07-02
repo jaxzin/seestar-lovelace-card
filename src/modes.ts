@@ -135,6 +135,8 @@ export interface DisplaySession {
   readonly liveImage?: string;
   /** `entity_id` of the preview camera (for alt text / future live view). */
   readonly cameraEntityId: string;
+  /** `entity_id` of the Phase-2 live-view camera (for more-info dialogs). */
+  readonly liveCameraEntityId: string;
   /**
    * When true (deep-sky / solar) the stacking donuts + sky dial render; when
    * false (scenery) the terrestrial framing box replaces them.
@@ -393,6 +395,7 @@ export function deriveDisplaySession(session: SeestarSession): DisplaySession {
     heroImage: preview.picture,
     liveImage: preview.livePicture,
     cameraEntityId: preview.cameraEntityId,
+    liveCameraEntityId: preview.liveCameraEntityId,
     sky,
     stack: {
       stacked: count(stack.stackedFrames),
