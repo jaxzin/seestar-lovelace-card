@@ -52,6 +52,25 @@ interface ActionColors {
   readonly fg: string;
 }
 
+/**
+ * Default control wiring: the bridge's command **button** entities are
+ * name-derived and deterministic (`button.<device>_<suffix>`), so when the
+ * user gives no explicit `actions:` config the card auto-wires each action to
+ * its canonical entity — but only if that entity actually exists in `hass`
+ * (older bridges without Phase-2 controls keep the button disabled).
+ * An explicit `actions.<key>` always wins over the default.
+ */
+const DEFAULT_ACTION_BUTTON_SUFFIX: Readonly<Record<string, string>> = {
+  stop_session: 'stop',
+  pause_plan: 'pause_plan',
+  goto: 'goto',
+  park: 'park',
+  start_session: 'start_live_view',
+};
+
+/** HA service that presses a `button` entity. */
+const BUTTON_PRESS_SERVICE = 'button.press';
+
 /** Tone → button colours, matching the design's `styleFor` mapping exactly. */
 const ACTION_COLORS: Readonly<Record<ActionTone, ActionColors>> = {
   primary: { bg: 'var(--primary-color)', fg: '#fff' },
@@ -552,9 +571,26 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     void this.hass.callService(domain, name, action.data);
   }
 
-  /** The user-configured service for an action key, if any. */
+  /**
+   * The effective service for an action key: the user's explicit
+   * `actions.<key>` config, else the default wiring to the bridge's canonical
+   * command button — when that entity exists in the current `hass` states.
+   */
   private actionConfig(key: string): ActionConfig | undefined {
-    return this.config?.actions?.[key];
+    const explicit = this.config?.actions?.[key];
+    if (explicit !== undefined) {
+      return explicit;
+    }
+    const suffix = DEFAULT_ACTION_BUTTON_SUFFIX[key];
+    const device = this.config?.device;
+    if (suffix === undefined || device === undefined || this.hass === undefined) {
+      return undefined;
+    }
+    const entityId = `button.${device}_${suffix}`;
+    if (this.hass.states[entityId] === undefined) {
+      return undefined;
+    }
+    return { service: BUTTON_PRESS_SERVICE, data: { entity_id: entityId } };
   }
 
   /** The hero's live camera image. */
