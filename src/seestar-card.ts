@@ -573,7 +573,10 @@ export class SeestarCard extends LitElement implements LovelaceCard {
   }
 
   private renderHero(display: DisplaySession): TemplateResult {
-    const image = display.heroImage;
+    // Saved = the stacked-still camera; Live = the Phase-2 /vid feed, which
+    // streams only while the bridge owns the session (else the placeholder
+    // explains why). The toggle never falls back to the other source silently.
+    const image = this.live ? display.liveImage : display.heroImage;
     const targetText = display.target;
     const subtitleText = display.subtitle;
     const label = `${targetText} · ${display.badge === 'stacking' ? 'STACKED' : 'LIVE'}`;
@@ -649,6 +652,9 @@ export class SeestarCard extends LitElement implements LovelaceCard {
 
   /** Placeholder hero hint per mode. */
   private heroHint(display: DisplaySession): string {
+    if (this.live) {
+      return 'live view runs only for sessions started from Home Assistant';
+    }
     if (display.mode === 'scenery') {
       return 'terrestrial / daylight';
     }
@@ -796,7 +802,9 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     if (config === undefined || hass === undefined) {
       return nothing;
     }
-    const display = deriveDisplaySession(resolve(hass, config.device, config.camera_entity));
+    const display = deriveDisplaySession(
+      resolve(hass, config.device, config.camera_entity, config.live_camera_entity),
+    );
     const accentStyle = config.accent !== undefined ? `--seestar-accent:${config.accent};--primary-color:${config.accent};` : undefined;
     return html`
       <ha-card style=${accentStyle ?? nothing}>

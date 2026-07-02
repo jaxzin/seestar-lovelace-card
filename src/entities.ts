@@ -71,6 +71,7 @@ export const ENTITY_KEYS = {
   },
   camera: {
     livePreview: 'live_stacked_preview',
+    liveView: 'live_view',
   },
 } as const;
 
@@ -231,6 +232,10 @@ export interface PreviewSnapshot {
   readonly cameraEntityId: string;
   /** Current preview image URL, when the feed is live. */
   readonly picture?: string;
+  /** `entity_id` of the Phase-2 live `/vid` camera. */
+  readonly liveCameraEntityId: string;
+  /** Real-time live-view URL — only while the bridge owns the session. */
+  readonly livePicture?: string;
 }
 
 /**
@@ -258,14 +263,22 @@ export interface SeestarSession {
  * collapse to `undefined`, so callers never see the literal strings
  * `"unavailable"`/`"unknown"` or `NaN`.
  */
-export function resolve(hass: HomeAssistant, prefix: string, cameraOverride?: string): SeestarSession {
-  const { sensor } = ENTITY_KEYS;
+export function resolve(
+  hass: HomeAssistant,
+  prefix: string,
+  cameraOverride?: string,
+  liveCameraOverride?: string,
+): SeestarSession {
+  const { sensor, camera } = ENTITY_KEYS;
   const cameraEntityId = resolveCameraEntityId(hass, prefix, cameraOverride);
+  const liveCameraEntityId = liveCameraOverride ?? `camera.${prefix}_${camera.liveView}`;
   return {
     prefix,
     preview: {
       cameraEntityId,
       picture: pictureForEntity(hass, cameraEntityId),
+      liveCameraEntityId,
+      livePicture: pictureForEntity(hass, liveCameraEntityId),
     },
     target: {
       telephotoTarget: sensorValue(hass, prefix, sensor.telephotoTarget),

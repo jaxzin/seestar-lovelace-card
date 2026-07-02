@@ -86,6 +86,11 @@ export interface SeestarCardConfig {
    * older `camera.<device>_live_preview` if that's what HA registered.
    */
   readonly camera_entity?: string;
+  /**
+   * Optional explicit live-view camera `entity_id` (the Phase-2 `/vid` feed).
+   * Defaults to `camera.<device>_live_view`.
+   */
+  readonly live_camera_entity?: string;
   /** Optional map of named actions → service calls for scope controls. */
   readonly actions?: Record<string, ActionConfig>;
 }

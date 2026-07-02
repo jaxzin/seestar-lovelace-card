@@ -115,6 +115,8 @@ export interface DisplaySession {
   readonly badge: BadgeKind;
   /** Live camera-preview URL, when the feed is up; `undefined` → placeholder. */
   readonly heroImage?: string;
+  /** Real-time live-view URL — present only while the bridge owns the session. */
+  readonly liveImage?: string;
   /** `entity_id` of the preview camera (for alt text / future live view). */
   readonly cameraEntityId: string;
   /**
@@ -362,6 +364,7 @@ export function deriveDisplaySession(session: SeestarSession): DisplaySession {
     subtitle: subtitleLine(session, mode),
     badge: stacking ? 'stacking' : 'live',
     heroImage: preview.picture,
+    liveImage: preview.livePicture,
     cameraEntityId: preview.cameraEntityId,
     sky,
     stack: {
