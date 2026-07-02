@@ -8,6 +8,10 @@
  * stacked count over the total, and a caption below joins the exposure,
  * integration time and dropped-frame count (omitting any empty part).
  *
+ * Unknown readings render explicitly rather than as fabricated zeros: when
+ * `stacked` or `total` is `undefined` no ticks fill (the ring stays all
+ * `--divider-color`) and the centre shows a muted `—` for the missing count.
+ *
  * All colours resolve to Home Assistant CSS custom properties so the ring
  * tracks the active light/dark theme automatically.
  */
@@ -38,6 +42,9 @@ const TICK_STROKE_WIDTH = 2.4;
 /** Separator between caption parts, matching the design two-space padding. */
 const CAPTION_SEPARATOR = '  ·  ';
 
+/** Placeholder shown for an unknown count. */
+const EMPTY_VALUE = '—';
+
 /** Convert degrees to radians. */
 function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
@@ -64,14 +71,14 @@ interface Tick {
  * strings (the card owns unit formatting); the component only draws them.
  */
 export class SeestarStackRing extends LitElement {
-  /** Frames successfully stacked so far. */
-  @property({ type: Number }) public stacked = 0;
+  /** Frames successfully stacked so far; `undefined` renders a muted `—`. */
+  @property({ type: Number }) public stacked?: number;
 
-  /** Total frames planned for this stack (clamped to at least 1). */
-  @property({ type: Number }) public total = 1;
+  /** Total frames planned; `undefined` renders `of —` with no fill fraction. */
+  @property({ type: Number }) public total?: number;
 
-  /** Frames dropped/rejected; omitted from the caption when zero. */
-  @property({ type: Number }) public dropped = 0;
+  /** Frames dropped/rejected; omitted from the caption when zero or unknown. */
+  @property({ type: Number }) public dropped?: number;
 
   /** Pre-formatted single-frame exposure, e.g. `"5 ms"`. */
   @property({ type: String }) public exposure = '';
@@ -113,6 +120,9 @@ export class SeestarStackRing extends LitElement {
       color: var(--primary-text-color);
       line-height: 1;
     }
+    .count.unknown {
+      color: var(--disabled-text-color, #9b9b9b);
+    }
     .of {
       font-size: 12px;
       color: var(--secondary-text-color);
@@ -125,9 +135,16 @@ export class SeestarStackRing extends LitElement {
     }
   `;
 
-  /** The number of ticks drawn in the accent colour for the current progress. */
+  /**
+   * The number of ticks drawn in the accent colour for the current progress.
+   * Zero when either count is unknown — an unknown fraction must not paint
+   * fabricated progress.
+   */
   private get filledTicks(): number {
-    const fraction = clamp(this.stacked / Math.max(1, this.total), 0, 1);
+    if (this.stacked === undefined || this.total === undefined || this.total <= 0) {
+      return 0;
+    }
+    const fraction = clamp(this.stacked / this.total, 0, 1);
     return Math.round(TICK_COUNT * fraction);
   }
 
@@ -162,7 +179,7 @@ export class SeestarStackRing extends LitElement {
     if (this.integration.length > 0) {
       parts.push(`${this.integration} integ`);
     }
-    if (this.dropped > 0) {
+    if (this.dropped !== undefined && this.dropped > 0) {
       parts.push(`${this.dropped} dropped`);
     }
     return parts.join(CAPTION_SEPARATOR);
@@ -170,8 +187,15 @@ export class SeestarStackRing extends LitElement {
 
   /** Screen-reader description of the ring's progress. */
   private get description(): string {
-    const percent = Math.round(clamp(this.stacked / Math.max(1, this.total), 0, 1) * 100);
-    return `${this.stacked} of ${this.total} frames stacked, ${percent} percent`;
+    const { stacked, total } = this;
+    if (stacked === undefined && total === undefined) {
+      return 'Stacking progress unknown';
+    }
+    if (stacked === undefined || total === undefined || total <= 0) {
+      return `${stacked ?? 'unknown'} of ${total ?? 'unknown'} frames stacked`;
+    }
+    const percent = Math.round(clamp(stacked / total, 0, 1) * 100);
+    return `${stacked} of ${total} frames stacked, ${percent} percent`;
   }
 
   private renderTick(tick: Tick): SVGTemplateResult {
@@ -201,8 +225,10 @@ export class SeestarStackRing extends LitElement {
             ${this.ticks.map((tick) => this.renderTick(tick))}
           </svg>
           <div class="center">
-            <div class="count">${this.stacked}</div>
-            <div class="of">of ${this.total}</div>
+            <div class="count${this.stacked === undefined ? ' unknown' : ''}">
+              ${this.stacked ?? EMPTY_VALUE}
+            </div>
+            <div class="of">of ${this.total ?? EMPTY_VALUE}</div>
           </div>
         </div>
         ${caption.length > 0 ? html`<div class="caption">${caption}</div>` : nothing}

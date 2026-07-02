@@ -16,7 +16,7 @@
 import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { resolve } from './entities.js';
-import { deriveDisplaySession, EMPTY_VALUE, type ActionModel, type ActionTone, type DisplaySession } from './modes.js';
+import { deriveDisplaySession, EMPTY_VALUE, type ActionModel, type ActionTone, type BadgeKind, type DisplaySession } from './modes.js';
 import { haIconName } from './components/index.js';
 import './components/index.js';
 import type { ActionConfig, HomeAssistant, LovelaceCard, SeestarCardConfig } from './types.js';
@@ -284,6 +284,10 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     .badge-dot.live {
       background: #ff5252;
       box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.28);
+    }
+    /* Unknown stacking state: a muted, glow-less dot — the badge claims nothing. */
+    .badge-dot.idle {
+      background: var(--disabled-text-color, #9b9b9b);
     }
     .hero-caption {
       position: absolute;
@@ -615,7 +619,9 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     const image = this.live ? display.liveImage : display.heroImage;
     const targetText = display.target;
     const subtitleText = display.subtitle;
-    const label = `${targetText} · ${display.badge === 'stacking' ? 'STACKED' : 'LIVE'}`;
+    const sourceLabel =
+      display.badge === 'stacking' ? 'STACKED' : display.badge === 'idle' ? 'IDLE' : 'LIVE';
+    const label = `${targetText} · ${sourceLabel}`;
     return html`
       <div class="hero">
         ${image !== undefined ? this.renderHeroImage(image, targetText) : this.renderHeroPlaceholder(display, label)}
@@ -655,13 +661,14 @@ export class SeestarCard extends LitElement implements LovelaceCard {
   }
 
   /** Badge kind, overridden to LIVE while the hero shows the live view. */
-  private badgeKind(display: DisplaySession): 'stacking' | 'live' {
+  private badgeKind(display: DisplaySession): BadgeKind {
     return this.live ? 'live' : display.badge;
   }
 
-  /** Badge label text for the current hero state. */
+  /** Badge label text for the current hero state; IDLE when state is unknown. */
   private badgeText(display: DisplaySession): string {
-    return this.badgeKind(display) === 'live' ? 'LIVE' : 'STACKING';
+    const kind = this.badgeKind(display);
+    return kind === 'stacking' ? 'STACKING' : kind === 'idle' ? 'IDLE' : 'LIVE';
   }
 
   /** Placeholder hero tint per mode. */
@@ -768,7 +775,12 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     `;
   }
 
-  private renderChips(display: DisplaySession): TemplateResult {
+  private renderChips(display: DisplaySession): TemplateResult | typeof nothing {
+    // Every chip may be dropped when its reading is unknown (e.g. right after a
+    // backend restart) — collapse the wrap instead of leaving an empty gap row.
+    if (display.chips.length === 0) {
+      return nothing;
+    }
     return html`
       <div class="chip-wrap">
         ${display.chips.map(

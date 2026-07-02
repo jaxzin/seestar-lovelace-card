@@ -9,10 +9,12 @@
       Standalone fidelity harness for OUR verification (not shipped).
 
       It imports the built card bundle, stubs the two Home Assistant frontend
-      elements the card relies on (`ha-card`, `ha-icon`), and mounts three
-      mock scopes — stargazing / solar / scenery — from the design's sample
-      data, side by side in a light and a dark themed wrapper so the mode
-      adaptation and theming can be eyeballed against the design.
+      elements the card relies on (`ha-card`, `ha-icon`), and mounts four
+      mock scopes — stargazing / solar / scenery from the design's sample
+      data, plus an all-unknown "after restart" scope whose entities are
+      absent or unavailable — side by side in a light and a dark themed
+      wrapper so the mode adaptation, theming and explicit unknown rendering
+      can be eyeballed against the design.
 
       Run: `npm run build`, then open this file in a browser.
     -->
@@ -141,9 +143,10 @@
   <body>
     <h1>Seestar Card — fidelity demo</h1>
     <p class="lead">
-      The built <code>seestar-card</code> mounted against three mock scopes (stargazing / solar / scenery) from the
-      design's sample data, in light and dark themes. Toggle <b>Saved / Live</b> on the hero and <b>Arm</b> to reveal
-      the wired action buttons.
+      The built <code>seestar-card</code> mounted against four mock scopes — stargazing / solar / scenery from the
+      design's sample data, plus an <b>all-unknown</b> scope (entities absent or unavailable, as after a backend
+      restart) that must show explicit <code>—</code> placeholders and never fabricated defaults — in light and dark
+      themes. Toggle <b>Saved / Live</b> on the hero and <b>Arm</b> to reveal the wired action buttons.
     </p>
 
     <div class="themes">
@@ -196,7 +199,8 @@
       // Entity ids follow the bridge contract: `<component>.<prefix>_<slug>`.
       const attr = (extra = {}) => ({ friendly_name: '', ...extra });
       const sensor = (prefix, slug, state) => [`sensor.${prefix}_${slug}`, { entity_id: `sensor.${prefix}_${slug}`, state: String(state), attributes: attr() }];
-      const binary = (prefix, slug, on) => [`binary_sensor.${prefix}_${slug}`, { entity_id: `binary_sensor.${prefix}_${slug}`, state: on ? 'on' : 'off', attributes: attr() }];
+      // Booleans map to on/off; strings pass through (e.g. 'unavailable' / 'unknown').
+      const binary = (prefix, slug, on) => [`binary_sensor.${prefix}_${slug}`, { entity_id: `binary_sensor.${prefix}_${slug}`, state: typeof on === 'boolean' ? (on ? 'on' : 'off') : String(on), attributes: attr() }];
 
       // Build a states map for one mock scope from a flat spec.
       function scopeStates(prefix, spec) {
@@ -264,6 +268,23 @@
           },
           binaries: { plan_running: false, tracking: false },
         },
+        // After a backend restart: a handful of entities exist but read
+        // unavailable/unknown, the rest are absent entirely. Every data point
+        // must render an explicit unknown (muted `—`, empty ring, hidden dial
+        // marker, IDLE badge, dropped chips) — never `0 of 0`, `0°` or
+        // `Not tracking`.
+        restart: {
+          prefix: 'restart',
+          sensors: {
+            telephoto_target: 'unavailable',
+            telephoto_mode: 'unknown',
+            stacked_frames: 'unavailable',
+            total_frames: 'unknown',
+            altitude: 'unavailable',
+            battery: 'unknown',
+          },
+          binaries: { tracking: 'unavailable', plan_running: 'unknown' },
+        },
       };
 
       const states = {};
@@ -290,7 +311,12 @@
         capture: { service: 'camera.snapshot' },
       };
 
-      const LABELS = { stargazing: '2A · Stargazing', solar: '2C · Solar', scenery: '2D · Scenery (adapts most)' };
+      const LABELS = {
+        stargazing: '2A · Stargazing',
+        solar: '2C · Solar',
+        scenery: '2D · Scenery (adapts most)',
+        restart: '2E · After restart (all unknown)',
+      };
 
       function mount(container, prefix, caption) {
         const slot = document.createElement('div');

@@ -14,8 +14,10 @@
  *   - `sun` → detection is labelled **"Active regions"** (sunspot ARs).
  *   - `star` / anything else → deep-sky: `sky` is true, detection labelled
  *     **"In frame"**.
- * - **badge** reads STACKING while a plan is running / actively stacking, else
- *   LIVE (scenery, or an idle scope).
+ * - **badge** reads STACKING while a plan is running / actively stacking, LIVE
+ *   when the scope is known not to be stacking (scenery, or an idle scope), and
+ *   a muted IDLE when neither reading is available (e.g. right after a bridge
+ *   restart) so the card never claims a state it can't see.
  * - **chips** and **actions** are built with fixed tones so the view never
  *   re-derives status colouring.
  *
@@ -40,8 +42,11 @@ export const EMPTY_VALUE = '—';
  */
 export type ImagingMode = 'star' | 'sun' | 'scenery';
 
-/** The hero status badge: STACKING while integrating, LIVE otherwise. */
-export type BadgeKind = 'stacking' | 'live';
+/**
+ * The hero status badge: STACKING while integrating, LIVE when known not to be
+ * stacking, IDLE (muted) when the stacking state is unknown.
+ */
+export type BadgeKind = 'stacking' | 'live' | 'idle';
 
 /** A status chip in the chip wrap: icon + label + tone. */
 export interface ChipModel {
@@ -72,21 +77,32 @@ export interface ActionModel {
   readonly tone: ActionTone;
 }
 
-/** The stacking-donut inputs, pre-formatted where the ring needs strings. */
+/**
+ * The stacking-donut inputs, pre-formatted where the ring needs strings.
+ * Counts are `undefined` when the reading is unknown (the ring renders `—` and
+ * no fill); caption strings are `''` when unknown so the ring omits them.
+ */
 export interface StackModel {
-  readonly stacked: number;
-  readonly total: number;
-  readonly dropped: number;
-  /** Pre-formatted single-frame exposure, e.g. `"10 s"`. */
+  /** Frames stacked so far, or `undefined` when unknown. */
+  readonly stacked?: number;
+  /** Total frames planned, or `undefined` when unknown. */
+  readonly total?: number;
+  /** Frames dropped, or `undefined` when unknown (omitted from the caption). */
+  readonly dropped?: number;
+  /** Pre-formatted single-frame exposure, e.g. `"10 s"`; `''` when unknown. */
   readonly exposure: string;
-  /** Pre-formatted cumulative integration, e.g. `"53 min"`. */
+  /** Pre-formatted cumulative integration, e.g. `"53 min"`; `''` when unknown. */
   readonly integration: string;
 }
 
-/** The sky-dial inputs (raw degrees; the dial clamps/wraps them). */
+/**
+ * The sky-dial inputs (raw degrees; the dial clamps/wraps them). Either axis is
+ * `undefined` when unknown — the dial then hides the marker and shows `—` in
+ * the readout instead of plotting a fabricated 0°.
+ */
 export interface DialModel {
-  readonly altitude: number;
-  readonly azimuth: number;
+  readonly altitude?: number;
+  readonly azimuth?: number;
 }
 
 /** The detected-objects section: a labelled wrap of catalog-object chips. */
@@ -176,9 +192,9 @@ function normalizeMode(raw: string | undefined): ImagingMode {
   return 'star';
 }
 
-/** Round-trip a possibly-undefined count to a non-negative integer. */
-function count(value: number | undefined): number {
-  return value === undefined ? 0 : Math.max(0, Math.round(value));
+/** Round a count to a non-negative integer, preserving "unknown". */
+function count(value: number | undefined): number | undefined {
+  return value === undefined ? undefined : Math.max(0, Math.round(value));
 }
 
 /** Format seconds as the design's compact exposure string (`"10 s"`, `"5 ms"`). */
@@ -229,19 +245,15 @@ function targetLine(session: SeestarSession, mode: ImagingMode): string {
   return mode === 'scenery' ? 'Scenery' : mode === 'sun' ? 'Sun' : EMPTY_VALUE;
 }
 
-/** The subtitle under the target: the mode string, or a mode-derived default. */
-function subtitleLine(session: SeestarSession, mode: ImagingMode): string {
+/**
+ * The subtitle under the target: the raw mode sensor string, or the `—`
+ * placeholder. When the mode sensor is unknown the card must not fabricate a
+ * mode description (and `mode` is always the `'star'` default then, so a
+ * mode-derived fallback could only ever claim "Deep-sky" dishonestly).
+ */
+function subtitleLine(session: SeestarSession): string {
   const raw = session.target.mode;
-  if (raw !== undefined && raw.length > 0) {
-    return raw;
-  }
-  if (mode === 'scenery') {
-    return 'Daylight landscape · Wide-field';
-  }
-  if (mode === 'sun') {
-    return 'White-light · Telephoto';
-  }
-  return 'Deep-sky · Telephoto';
+  return raw !== undefined && raw.length > 0 ? raw : EMPTY_VALUE;
 }
 
 /** True when a plan is actively running or the stack state reads as stacking. */
@@ -250,6 +262,18 @@ function isStacking(mount: MountSnapshot, stackState: string | undefined): boole
     return true;
   }
   return (stackState ?? '').toLowerCase().includes('stack');
+}
+
+/**
+ * The hero badge: STACKING when stacking, LIVE when at least one reading says
+ * the scope is live-but-not-stacking, and IDLE when both readings are unknown
+ * (a restarted backend must not claim STACKING or LIVE it can't verify).
+ */
+function deriveBadge(mount: MountSnapshot, stackState: string | undefined): BadgeKind {
+  if (isStacking(mount, stackState)) {
+    return 'stacking';
+  }
+  return mount.planRunning === undefined && stackState === undefined ? 'idle' : 'live';
 }
 
 /** Split the comma/newline-separated `catalog_objects` sensor into names. */
@@ -272,10 +296,13 @@ function detectedMeta(mode: ImagingMode): { readonly label: string; readonly ico
   return { label: 'In frame', icon: 'mdi:star-four-points-outline' };
 }
 
-/** The mount-mode chip (EQ / Alt-Az / wide-field), from the mount snapshot. */
-function mountChip(mount: MountSnapshot): ChipModel {
-  const raw = (mount.mountMode ?? '').toLowerCase();
-  if (raw.includes('eq')) {
+/**
+ * The mount-mode chip (EQ / Alt-Az), from a **known** mount-mode reading —
+ * callers omit the chip entirely when the sensor is unknown, so an unreadable
+ * mount never masquerades as "Alt-Az".
+ */
+function mountChip(mountMode: string): ChipModel {
+  if (mountMode.toLowerCase().includes('eq')) {
     return { icon: 'mdi:rotate-3d-variant', label: 'EQ mode', tone: 'neutral' };
   }
   return { icon: 'mdi:axis-arrow', label: 'Alt-Az', tone: 'neutral' };
@@ -307,8 +334,8 @@ function buildChips(
 
   if (mode === 'scenery') {
     chips.push({ icon: 'mdi:image-filter-hdr', label: 'Scenery', tone: 'neutral' });
-  } else {
-    chips.push(mountChip(mount));
+  } else if (mount.mountMode !== undefined) {
+    chips.push(mountChip(mount.mountMode));
   }
 
   if (health.battery !== undefined) {
@@ -361,22 +388,24 @@ export function deriveDisplaySession(session: SeestarSession): DisplaySession {
   return {
     mode,
     target: targetLine(session, mode),
-    subtitle: subtitleLine(session, mode),
-    badge: stacking ? 'stacking' : 'live',
+    subtitle: subtitleLine(session),
+    badge: deriveBadge(mount, stack.state),
     heroImage: preview.picture,
     liveImage: preview.livePicture,
     cameraEntityId: preview.cameraEntityId,
     sky,
     stack: {
       stacked: count(stack.stackedFrames),
-      total: Math.max(1, count(stack.totalFrames)),
+      total: count(stack.totalFrames),
       dropped: count(stack.droppedFrames),
-      exposure: formatExposure(stack.exposureSeconds),
+      // The ring's caption omits empty parts, so an unknown exposure becomes
+      // '' here (dropped) rather than a dangling '—' segment.
+      exposure: stack.exposureSeconds === undefined ? '' : formatExposure(stack.exposureSeconds),
       integration: formatIntegration(stack.integrationMinutes),
     },
     dial: {
-      altitude: pointing.altitude ?? 0,
-      azimuth: pointing.azimuth ?? 0,
+      altitude: pointing.altitude,
+      azimuth: pointing.azimuth,
     },
     terrestrialExposure: formatExposure(stack.exposureSeconds),
     starsDetectedInDaylight: inDaylight,
