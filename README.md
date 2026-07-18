@@ -13,7 +13,15 @@ directly.
 
 ## Preview
 
-Want to see the card before installing anything? The repo ships a standalone
+<p align="center">
+  <img src="images/card-light.png" alt="Seestar card in a light theme" width="340">
+  <img src="images/card-dark.png" alt="Seestar card in a dark theme" width="340">
+</p>
+
+The card follows the active Home Assistant theme — light and dark shown above,
+rendered against the demo's "stargazing" mock scope.
+
+Want to poke at it before installing anything? The repo ships a standalone
 fidelity demo. Run the [build](#development), then open
 [`demo/index.html`](demo/index.html) in a browser — it mounts the real card
 bundle against four mock scopes (stargazing, solar, scenery, and a
