@@ -1,7 +1,7 @@
 # Seestar Card
 
 A custom [Home Assistant](https://www.home-assistant.io/) Lovelace card for
-**ZWO Seestar** telescopes (S30 / S50). It renders one scope's live imaging
+**ZWO Seestar** telescopes. It renders one scope's live imaging
 state — the stacked-image preview, current target and mode, stacking progress,
 plate-solved pointing, plan/mount status, and device health — as a single
 self-theming card.
@@ -26,7 +26,7 @@ Assistant required.
 - The [`ha-seestar`](https://github.com/jaxzin/ha-seestar) bridge add-on,
   installed and **publishing entities** for your scope over MQTT. The card is a
   view over those entities — without the bridge it has nothing to render.
-- A [ZWO Seestar](https://www.seestar.com/) (S30 / S50) on the same network, in
+- A [ZWO Seestar](https://www.seestar.com/) on the same network, in
   station mode, per the bridge's setup.
 
 > **Note on firmware ≥ 7.18:** the telemetry this card shows (target, stacking

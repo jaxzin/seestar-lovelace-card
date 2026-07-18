@@ -1,5 +1,5 @@
 /**
- * `seestar-card` — a Home Assistant custom Lovelace card for the Seestar S30 Pro
+ * `seestar-card` — a Home Assistant custom Lovelace card for the Seestar
  * bridge (the **Glance** concept).
  *
  * The card takes a single `device: <prefix>` config, resolves the ~46

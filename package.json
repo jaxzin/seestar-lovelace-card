@@ -1,7 +1,7 @@
 {
   "name": "seestar-lovelace-card",
   "version": "0.1.0",
-  "description": "Home Assistant custom Lovelace card for the Seestar S30 Pro bridge.",
+  "description": "Home Assistant dashboard card for ZWO Seestar telescopes.",
   "author": "Brian R. Jackson",
   "license": "MIT",
   "type": "module",
