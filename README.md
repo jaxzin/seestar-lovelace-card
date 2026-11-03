@@ -11,6 +11,10 @@ The card is a pure frontend consumer of the entities the
 over MQTT. It reads Home Assistant state only; it does not talk to the scope
 directly.
 
+> **Setting up the whole Seestar stack?** Start at
+> [ha-seestar → Quick Start](https://github.com/jaxzin/ha-seestar#quick-start-home-assistant-os--supervised):
+> it installs the driver and bridge add-ons and this card in one pass.
+
 ## Preview
 
 <p align="center">
