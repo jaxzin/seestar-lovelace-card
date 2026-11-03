@@ -13,7 +13,8 @@ directly.
 
 > **Setting up the whole Seestar stack?** Start at
 > [ha-seestar → Quick Start](https://github.com/jaxzin/ha-seestar#quick-start-home-assistant-os--supervised):
-> it installs the driver and bridge add-ons and this card in one pass.
+> it installs the driver and bridge add-ons, this card and the optional Seestar
+> Sync archiver in one pass.
 
 ## Preview
 
