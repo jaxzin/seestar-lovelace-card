@@ -52,20 +52,36 @@ Assistant required.
 
 ## Getting started
 
-### Install via HACS (recommended)
+### Install via the Marketplace or HACS (recommended)
 
-[HACS](https://hacs.xyz/) handles resource registration and updates for you.
+Both register the `dist/seestar-card.js` Lovelace resource for you and keep the
+card up to date. Home Assistant **2026.11 and later** has the built-in
+**Marketplace** (Settings → Marketplace); earlier versions use
+[HACS](https://hacs.xyz/).
+
+**Home Assistant 2026.11 or later (Marketplace):**
+
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=jaxzin&repository=seestar-lovelace-card&category=plugin)
+
+1. Select the badge. The Marketplace opens this card's page. If the Marketplace
+   does not list the card yet, it offers to add the repository first (this needs
+   a GitHub connection).
+2. Install **Seestar Card** from that page, then reload your browser.
+
+**Home Assistant before 2026.11 (HACS):**
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jaxzin&repository=seestar-lovelace-card&category=plugin)
+
+Or add it by hand:
 
 1. In HACS, open the **⋮** menu → **Custom repositories**.
 2. Add this repository's URL with category **Dashboard**.
 3. Find **Seestar Card** in HACS, install it, then reload your browser.
 
-HACS registers the `dist/seestar-card.js` Lovelace resource automatically.
-
 ### Install manually
 
-If you don't run HACS, install the bundle by hand (you'll need to repeat step 3
-on every update):
+If you use neither the Marketplace nor HACS, install the bundle by hand (you'll
+need to repeat step 3 on every update):
 
 1. Copy [`dist/seestar-card.js`](dist/seestar-card.js) into your Home Assistant
    `config/www/` directory. That folder is served at `/local/`, so the file
@@ -76,8 +92,9 @@ on every update):
    - **Resource type:** **JavaScript Module**.
 3. Reload your browser.
 
-> Prefer the [HACS path](#install-via-hacs-recommended) if you can — it adds the
-> resource and keeps the card up to date for you.
+> Prefer the
+> [Marketplace or HACS path](#install-via-the-marketplace-or-hacs-recommended)
+> if you can — it adds the resource and keeps the card up to date for you.
 
 ### Add the card
 
@@ -162,9 +179,10 @@ npm run lint    # tsc --noEmit (type-check)
 npm run build   # bundle to dist/seestar-card.js
 ```
 
-`dist/seestar-card.js` is committed so HACS can serve it directly. CI rebuilds
-it and fails if the committed bundle drifts from `src/`, so **rebuild and commit
-`dist/` whenever you change `src/`**. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+`dist/seestar-card.js` is committed so the Marketplace and HACS can serve it
+directly. CI rebuilds it and fails if the committed bundle drifts from `src/`,
+so **rebuild and commit `dist/` whenever you change `src/`**. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for
 the full workflow and [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License

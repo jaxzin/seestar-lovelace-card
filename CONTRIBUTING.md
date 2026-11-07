@@ -32,9 +32,10 @@ refresh.
 
 ## The committed bundle
 
-`dist/seestar-card.js` is **committed on purpose** — HACS and the manual install
-serve it directly. The CI workflow rebuilds it and runs `git diff --exit-code
-dist/`, so a pull request whose `dist/` doesn't match a fresh build of `src/`
+`dist/seestar-card.js` is **committed on purpose** — the Marketplace, HACS and
+the manual install serve it directly. The CI workflow rebuilds it and runs
+`git diff --exit-code dist/`, so a pull request whose `dist/` doesn't match a
+fresh build of `src/`
 will fail.
 
 Whenever you change anything under `src/`:
