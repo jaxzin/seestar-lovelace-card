@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-07-02
+## [0.1.0] - 2026-11-07
 
 Initial public release.
 
@@ -24,6 +24,8 @@ Initial public release.
 - Fully theme-driven styling that tracks the active Home Assistant light/dark
   theme.
 - HACS support (`hacs.json`) with the committed `dist/seestar-card.js` bundle.
+- Install instructions and My Home Assistant badges for the Home Assistant
+  Marketplace (2026.11 and later) alongside HACS.
 - Standalone `demo/index.html` fidelity harness.
 
 [Unreleased]: https://github.com/jaxzin/seestar-lovelace-card/compare/v0.1.0...HEAD
