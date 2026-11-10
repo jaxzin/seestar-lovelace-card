@@ -71,6 +71,9 @@ const DEFAULT_ACTION_BUTTON_SUFFIX: Readonly<Record<string, string>> = {
 /** HA service that presses a `button` entity. */
 const BUTTON_PRESS_SERVICE = 'button.press';
 
+/** Caption of the Saved image: the last stack the scope saved to disk. */
+const SAVED_STACK_LABEL = 'Last saved stack';
+
 /** Tone → button colours, matching the design's `styleFor` mapping exactly. */
 const ACTION_COLORS: Readonly<Record<ActionTone, ActionColors>> = {
   primary: { bg: 'var(--primary-color)', fg: '#fff' },
@@ -100,8 +103,49 @@ export class SeestarCard extends LitElement implements LovelaceCard {
   /** Whether the controls are armed. Off by default for safety. */
   @state() private armed = false;
 
-  /** Whether the hero shows the live video view (vs the saved still). */
-  @state() private live = false;
+  /**
+   * The user's Saved/Live choice, or `undefined` to follow the scope: the live
+   * camera while it carries the stack in progress or live video, else Saved.
+   */
+  @state() private live?: boolean;
+
+  /** Pending re-render for when frame freshness stops implying STACKING. */
+  private stackingExpiryTimer?: number;
+
+  public override connectedCallback(): void {
+    super.connectedCallback();
+    // The expiry timer is dropped while detached; re-derive so a lapsed
+    // STACKING badge doesn't survive a reattach with unchanged `hass`.
+    this.requestUpdate();
+  }
+
+  public override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.clearStackingExpiry();
+  }
+
+  private clearStackingExpiry(): void {
+    if (this.stackingExpiryTimer !== undefined) {
+      window.clearTimeout(this.stackingExpiryTimer);
+      this.stackingExpiryTimer = undefined;
+    }
+  }
+
+  /**
+   * The STACKING badge can lapse with no HA state change (frames simply stop
+   * arriving), so re-render just after the derivation's freshness deadline.
+   */
+  private scheduleStackingExpiry(expiresAtMs: number | undefined): void {
+    this.clearStackingExpiry();
+    if (expiresAtMs === undefined || !this.isConnected) {
+      return;
+    }
+    const delayMs = Math.max(0, expiresAtMs - Date.now()) + 1;
+    this.stackingExpiryTimer = window.setTimeout(() => {
+      this.stackingExpiryTimer = undefined;
+      this.requestUpdate();
+    }, delayMs);
+  }
 
   /** Lazily returns the config-editor element for the Lovelace UI editor. */
   public static getConfigElement(): HTMLElement {
@@ -139,7 +183,7 @@ export class SeestarCard extends LitElement implements LovelaceCard {
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       object-position: center;
       display: block;
     }
@@ -573,13 +617,18 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     this.live = true;
   }
 
+  /** Whether the hero shows the live camera (see {@link live}). */
+  private showsLive(display: DisplaySession): boolean {
+    return this.live ?? (display.liveImage !== undefined && display.badge !== 'idle');
+  }
+
   /**
    * Open HA's more-info dialog (the full-size camera view) for whichever
    * source the hero is showing: Saved -> the stacked-preview camera,
    * Live -> the live-view camera.
    */
   private openHeroMoreInfo(display: DisplaySession): void {
-    const entityId = this.live ? display.liveCameraEntityId : display.cameraEntityId;
+    const entityId = this.showsLive(display) ? display.liveCameraEntityId : display.cameraEntityId;
     this.dispatchEvent(
       new CustomEvent('hass-more-info', {
         detail: { entityId },
@@ -628,32 +677,37 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     return { service: BUTTON_PRESS_SERVICE, data: { entity_id: entityId } };
   }
 
-  /** The hero's live camera image. */
-  private renderHeroImage(image: string, target: string): TemplateResult {
-    return html`<img src=${image} alt=${`Live capture of ${target}`} />`;
+  /** The hero's camera image. */
+  private renderHeroImage(image: string, alt: string): TemplateResult {
+    return html`<img src=${image} alt=${alt} />`;
   }
 
   /** The hero's striped placeholder shown while no camera image is live. */
-  private renderHeroPlaceholder(display: DisplaySession, label: string): TemplateResult {
+  private renderHeroPlaceholder(display: DisplaySession, label: string, live: boolean): TemplateResult {
     return html`<div class="hero-placeholder" style=${`background:${this.heroTint(display)};`}>
       <div class="hero-stripes"></div>
       <ha-icon icon=${this.heroIcon(display)} aria-hidden="true"></ha-icon>
       <span class="hero-label">${label}</span>
-      <span class="hero-hint">${this.heroHint(display)}</span>
+      <span class="hero-hint">${this.heroHint(display, live)}</span>
     </div>`;
   }
 
   private renderHero(display: DisplaySession): TemplateResult {
-    // Saved = the stacked-still camera; Live = the Phase-2 /vid feed, which
-    // streams only while the bridge owns the session (else the placeholder
-    // explains why). The toggle never falls back to the other source silently.
-    const image = this.live ? display.liveImage : display.heroImage;
-    const targetText = display.target;
-    const subtitleText = display.subtitle;
+    // Saved = the last stack the scope saved; Live = the live camera: the
+    // stack being built (whoever started it) or a video session started from
+    // HA. With no explicit choice the hero follows the scope (showsLive); a
+    // chosen source never falls back to the other one silently.
+    const live = this.showsLive(display);
+    const image = live ? display.liveImage : display.heroImage;
+    // A saved image is titled by its own target, never the current one (the
+    // Live view names that). With no image the caption describes the scope.
+    const savedShown = !live && image !== undefined;
+    const targetText = savedShown ? (display.savedTarget ?? SAVED_STACK_LABEL) : display.target;
+    const subtitleText = savedShown ? (display.savedTarget !== undefined ? SAVED_STACK_LABEL : '') : display.subtitle;
     const sourceLabel =
       display.badge === 'stacking' ? 'STACKED' : display.badge === 'idle' ? 'IDLE' : 'LIVE';
     const label = `${targetText} · ${sourceLabel}`;
-    const mediaLabel = this.live ? 'Open the live view camera' : 'Open the stacked preview camera';
+    const mediaLabel = live ? 'Open the live view camera' : 'Open the stacked preview camera';
     return html`
       <div class="hero">
         <button
@@ -663,24 +717,26 @@ export class SeestarCard extends LitElement implements LovelaceCard {
           title=${mediaLabel}
           @click=${() => this.openHeroMoreInfo(display)}
         >
-          ${image !== undefined ? this.renderHeroImage(image, targetText) : this.renderHeroPlaceholder(display, label)}
+          ${image !== undefined
+            ? this.renderHeroImage(image, live ? `Live view of ${targetText}` : [SAVED_STACK_LABEL, display.savedTarget].filter(Boolean).join(': '))
+            : this.renderHeroPlaceholder(display, label, live)}
         </button>
         <div class="scrim-top"></div>
         <div class="scrim-bottom"></div>
 
         <div class="source-toggle" role="group" aria-label="Image source">
-          ${this.renderSourceButton('mdi:image-outline', 'Saved', !this.live, this.showSaved, false)}
-          ${this.renderSourceButton('mdi:video-outline', 'Live', this.live, this.showLive, true)}
+          ${this.renderSourceButton('mdi:image-outline', 'Saved', !live, this.showSaved, false)}
+          ${this.renderSourceButton('mdi:video-outline', 'Live', live, this.showLive, true)}
         </div>
 
         <div class="badge">
-          <span class="badge-dot ${this.badgeKind(display)}"></span>
-          <span>${this.badgeText(display)}</span>
+          <span class="badge-dot ${display.badge}"></span>
+          <span>${this.badgeText(display.badge)}</span>
         </div>
 
         <div class="hero-caption">
           <div class="hero-target">${targetText}</div>
-          <div class="hero-mode">${subtitleText}</div>
+          ${subtitleText !== '' ? html`<div class="hero-mode">${subtitleText}</div>` : nothing}
         </div>
       </div>
     `;
@@ -700,14 +756,12 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     </button>`;
   }
 
-  /** Badge kind, overridden to LIVE while the hero shows the live view. */
-  private badgeKind(display: DisplaySession): BadgeKind {
-    return this.live ? 'live' : display.badge;
-  }
-
-  /** Badge label text for the current hero state; IDLE when state is unknown. */
-  private badgeText(display: DisplaySession): string {
-    const kind = this.badgeKind(display);
+  /**
+   * Badge label text. The badge reports the scope's state, never the chosen
+   * image source: the live camera is fed through seestar_alp, so picking it
+   * must not turn the badge into LIVE.
+   */
+  private badgeText(kind: BadgeKind): string {
     return kind === 'stacking' ? 'STACKING' : kind === 'idle' ? 'IDLE' : 'LIVE';
   }
 
@@ -734,9 +788,9 @@ export class SeestarCard extends LitElement implements LovelaceCard {
   }
 
   /** Placeholder hero hint per mode. */
-  private heroHint(display: DisplaySession): string {
-    if (this.live) {
-      return 'live view runs only for sessions started from Home Assistant';
+  private heroHint(display: DisplaySession, live: boolean): string {
+    if (live) {
+      return 'live view shows a stack in progress or a session started from Home Assistant';
     }
     if (display.mode === 'scenery') {
       return 'terrestrial / daylight';
@@ -893,6 +947,7 @@ export class SeestarCard extends LitElement implements LovelaceCard {
     const display = deriveDisplaySession(
       resolve(hass, config.device, config.camera_entity, config.live_camera_entity),
     );
+    this.scheduleStackingExpiry(display.stackingExpiresAtMs);
     const accentStyle = config.accent !== undefined ? `--seestar-accent:${config.accent};--primary-color:${config.accent};` : undefined;
     return html`
       <ha-card style=${accentStyle ?? nothing}>

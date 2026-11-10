@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The hero follows the scope: it shows the **Live** camera while a stack is in
+  progress (whoever started it, the Seestar app included) or a video session is
+  live, and the **Saved** image otherwise. Picking Saved or Live still pins
+  that choice.
+- The **Saved** view is titled with the saved image's own target (from the
+  last saved filename) and captioned "Last saved stack", never with the current
+  target; the Live view names that.
+- The image is shown whole (letterboxed) instead of cropped to the hero.
+
+### Fixed
+
+- The badge reads **STACKING** for a stack started from the Seestar app (no
+  plan running): sub-frames still arriving count as stacking, and the badge
+  drops back on its own once they stop, without waiting for another state
+  change.
+- **LIVE** only appears for live video. A stack served through seestar_alp is
+  never labelled LIVE, and choosing the Live source no longer turns the badge
+  into LIVE.
+- The Live image updates as each new sub-frame arrives (it uses the bridge's
+  `image_updated` attribute; needs ha-seestar 1.2.0).
+
 ## [0.1.0] - 2026-11-07
 
 Initial public release.
