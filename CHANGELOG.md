@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
 ### Changed
 
 - The hero follows the scope: it shows the **Live** camera while a stack is in
@@ -51,5 +53,6 @@ Initial public release.
   Marketplace (2026.11 and later) alongside HACS.
 - Standalone `demo/index.html` fidelity harness.
 
-[Unreleased]: https://github.com/jaxzin/seestar-lovelace-card/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jaxzin/seestar-lovelace-card/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jaxzin/seestar-lovelace-card/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jaxzin/seestar-lovelace-card/releases/tag/v0.1.0
