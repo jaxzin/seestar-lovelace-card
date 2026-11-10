@@ -121,7 +121,7 @@ scope's name). The card derives every entity id from it, e.g.
 | `name`              | string                           | the device prefix                                                              | Card title override.                                                                                     |
 | `accent`            | string                           | `--primary-color`                                                              | Accent colour (any CSS colour).                                                                          |
 | `camera_entity`     | string                           | `camera.<device>_live_stacked_preview`, falling back to `camera.<device>_live_preview` | Override the "Saved" hero camera entity. Set this if Home Assistant deduped yours to a `_2` suffix. |
-| `live_camera_entity`| string                           | `camera.<device>_live_view`                                                    | Override the "Live" (`/vid`) hero camera entity.                                                        |
+| `live_camera_entity`| string                           | `camera.<device>_live_view`                                                    | Override the "Live" hero camera entity (the stack in progress, or live video).                          |
 | `actions`           | map of key → `{service, data}`   | auto-wired to the bridge's control buttons                                     | Override scope-control service calls — see [Actions](#actions).                                          |
 
 Example with overrides:

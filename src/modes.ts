@@ -14,10 +14,10 @@
  *   - `sun` → detection is labelled **"Active regions"** (sunspot ARs).
  *   - `star` / anything else → deep-sky: `sky` is true, detection labelled
  *     **"In frame"**.
- * - **badge** reads STACKING while a plan is running / actively stacking, LIVE
- *   when the scope is known not to be stacking (scenery, or an idle scope), and
- *   a muted IDLE when neither reading is available (e.g. right after a bridge
- *   restart) so the card never claims a state it can't see.
+ * - **badge** reads STACKING while a plan is running or sub-frames are still
+ *   arriving (the stacked/dropped count changed within a few exposures), LIVE
+ *   only while the live feed is serving a picture, and a muted IDLE otherwise,
+ *   so the card never claims a state it can't see.
  * - **chips** and **actions** are built with fixed tones so the view never
  *   re-derives status colouring.
  *
@@ -29,6 +29,8 @@ import type {
   DetectionSnapshot,
   HealthSnapshot,
   MountSnapshot,
+  PreviewSnapshot,
+  StackSnapshot,
   SeestarSession,
 } from './entities.js';
 import type { StatChipTone } from './components/index.js';
@@ -43,8 +45,8 @@ export const EMPTY_VALUE = '—';
 export type ImagingMode = 'star' | 'sun' | 'scenery';
 
 /**
- * The hero status badge: STACKING while integrating, LIVE when known not to be
- * stacking, IDLE (muted) when the stacking state is unknown.
+ * The hero status badge: STACKING while integrating, LIVE while the live
+ * camera carries live video (never a stacked image), IDLE (muted) otherwise.
  */
 export type BadgeKind = 'stacking' | 'live' | 'idle';
 
@@ -131,6 +133,17 @@ export interface DisplaySession {
   readonly badge: BadgeKind;
   /** Live camera-preview URL, when the feed is up; `undefined` → placeholder. */
   readonly heroImage?: string;
+  /**
+   * The primary target of the saved image, e.g. `"IC 434"`, parsed from the
+   * last saved filename; `undefined` when the filename doesn't name one. The
+   * saved camera shows the scope's last SAVED stack, never the current one.
+   */
+  readonly savedTarget?: string;
+  /**
+   * When frame freshness alone keeps the badge at STACKING, the epoch ms at
+   * which that lapses; the card re-renders then even if no HA state changes.
+   */
+  readonly stackingExpiresAtMs?: number;
   /** Real-time live-view URL — present only while the bridge owns the session. */
   readonly liveImage?: string;
   /** `entity_id` of the preview camera (for alt text / future live view). */
@@ -258,24 +271,63 @@ function subtitleLine(session: SeestarSession): string {
   return raw !== undefined && raw.length > 0 ? raw : EMPTY_VALUE;
 }
 
-/** True when a plan is actively running or the stack state reads as stacking. */
-function isStacking(mount: MountSnapshot, stackState: string | undefined): boolean {
-  if (mount.planRunning === true) {
-    return true;
+/** seestar_alp's terminal Stack states (`terminal_states` in seestar_device.py). */
+const TERMINAL_STACK_STATES: ReadonlySet<string> = new Set(['complete', 'fail', 'cancel']);
+
+/** Frames count as still arriving for this many sub-exposures after the last one. */
+const FRESH_FRAME_EXPOSURES = 3;
+
+/** Floor for the frames-arriving window, covering short exposures and unknown ones. */
+const MIN_FRESH_FRAME_MS = 120_000;
+
+/**
+ * Until when arriving sub-frames keep the scope "stacking" (epoch ms): the
+ * last stacked/dropped count change plus {@link FRESH_FRAME_EXPOSURES}
+ * exposures. `undefined` when no count is known or the stack is terminal.
+ */
+function framesFreshUntilMs(stack: StackSnapshot): number | undefined {
+  if (TERMINAL_STACK_STATES.has((stack.state ?? '').toLowerCase()) || stack.framesChangedAtMs === undefined) {
+    return undefined;
   }
-  return (stackState ?? '').toLowerCase().includes('stack');
+  return stack.framesChangedAtMs + Math.max(MIN_FRESH_FRAME_MS, (stack.exposureSeconds ?? 0) * 1000 * FRESH_FRAME_EXPOSURES);
 }
 
 /**
- * The hero badge: STACKING when stacking, LIVE when at least one reading says
- * the scope is live-but-not-stacking, and IDLE when both readings are unknown
- * (a restarted backend must not claim STACKING or LIVE it can't verify).
+ * True when a plan is running (this takes precedence over everything else), or
+ * when sub-frames are still arriving per {@link framesFreshUntilMs}. The latter
+ * covers a stack started from the Seestar app, which reports no plan and parks
+ * `stack_state` on `frame_complete`.
  */
-function deriveBadge(mount: MountSnapshot, stackState: string | undefined): BadgeKind {
-  if (isStacking(mount, stackState)) {
+function isStacking(mount: MountSnapshot, freshUntilMs: number | undefined, nowMs: number): boolean {
+  if (mount.planRunning === true) {
+    return true;
+  }
+  return freshUntilMs !== undefined && nowMs <= freshUntilMs;
+}
+
+/** Raw `telephoto_mode` of deep-sky imaging, whose live image is the stack. */
+const STAR_TELEPHOTO_MODE = 'star';
+
+/**
+ * The hero badge: STACKING when stacking; LIVE only while the live camera
+ * carries live video (an HA-started sun/moon/planet/scenery session); IDLE
+ * otherwise. In star mode the live camera only ever carries the stacked image
+ * seestar_alp fetched, which is never labelled LIVE.
+ */
+function deriveBadge(stacking: boolean, liveVideo: boolean): BadgeKind {
+  if (stacking) {
     return 'stacking';
   }
-  return mount.planRunning === undefined && stackState === undefined ? 'idle' : 'live';
+  return liveVideo ? 'live' : 'idle';
+}
+
+/** `Stacked_287_IC 434_60.0s_LP_20261109-054001.fit` → `IC 434`. */
+const SAVED_STACK_TARGET = /^Stacked_\d+_(.+?)_\d+(?:\.\d+)?s_/;
+
+/** The saved image's target, when its filename names one. */
+function savedTargetFor(preview: PreviewSnapshot): string | undefined {
+  const name = preview.savedFile?.split('/').pop() ?? '';
+  return SAVED_STACK_TARGET.exec(name)?.[1];
 }
 
 /** Split the comma/newline-separated `catalog_objects` sensor into names. */
@@ -379,11 +431,13 @@ function buildChips(
  * always returns a renderable session — missing values become placeholders,
  * greyed states, or dropped chips, exactly as the design specifies.
  */
-export function deriveDisplaySession(session: SeestarSession): DisplaySession {
+export function deriveDisplaySession(session: SeestarSession, nowMs: number = Date.now()): DisplaySession {
   const { target, stack, pointing, mount, detection, health, preview } = session;
   const mode = normalizeMode(target.mode);
   const sky = mode !== 'scenery';
-  const stacking = isStacking(mount, stack.state);
+  const freshUntilMs = framesFreshUntilMs(stack);
+  const stacking = isStacking(mount, freshUntilMs, nowMs);
+  const expiresByFreshness = stacking && mount.planRunning !== true;
   const inDaylight = DAYLIGHT_MODES.has(mode);
   const meta = detectedMeta(mode);
 
@@ -391,8 +445,13 @@ export function deriveDisplaySession(session: SeestarSession): DisplaySession {
     mode,
     target: targetLine(session, mode),
     subtitle: subtitleLine(session),
-    badge: deriveBadge(mount, stack.state),
+    badge: deriveBadge(
+      stacking,
+      preview.livePicture !== undefined && (target.mode ?? '').toLowerCase() !== STAR_TELEPHOTO_MODE,
+    ),
     heroImage: preview.picture,
+    savedTarget: savedTargetFor(preview),
+    stackingExpiresAtMs: expiresByFreshness ? freshUntilMs : undefined,
     liveImage: preview.livePicture,
     cameraEntityId: preview.cameraEntityId,
     liveCameraEntityId: preview.liveCameraEntityId,

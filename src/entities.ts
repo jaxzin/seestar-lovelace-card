@@ -59,6 +59,7 @@ export const ENTITY_KEYS = {
     focuserPosition: 'focuser_position',
     firmware: 'firmware',
     lastAlert: 'last_alert',
+    lastSavedFile: 'last_saved_file',
   },
   binarySensor: {
     planRunning: 'plan_running',
@@ -120,6 +121,27 @@ function numericValue(hass: HomeAssistant, prefix: string, key: SensorKey): numb
 }
 
 /**
+ * When a live sensor's value last changed (HA `last_changed`, epoch ms), or
+ * `undefined` when the entity is unavailable or the timestamp is missing.
+ */
+function changedAtMs(hass: HomeAssistant, prefix: string, key: SensorKey): number | undefined {
+  const entity = stateOf(hass, entityId('sensor', prefix, key));
+  if (!isLive(entity) || entity.last_changed === undefined) {
+    return undefined;
+  }
+  const parsed = Date.parse(entity.last_changed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/** The later of two optional timestamps. */
+function latest(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) {
+    return b;
+  }
+  return b === undefined ? a : Math.max(a, b);
+}
+
+/**
  * A binary sensor as a tri-state boolean: `true`/`false` when live, `undefined`
  * when the entity is missing or unavailable (so the view can distinguish "off"
  * from "no data").
@@ -156,14 +178,31 @@ function resolveCameraEntityId(hass: HomeAssistant, prefix: string, override?: s
   return `camera.${prefix}_${CAMERA_FALLBACK_KEYS[0]}`;
 }
 
-/** A camera entity's `entity_picture` attribute URL, when the feed is live. */
+/**
+ * The bridge's per-image version attribute on its live camera (epoch ms of the
+ * publish). HA keeps `entity_picture` fixed when only the image changes.
+ */
+const IMAGE_VERSION_ATTR = 'image_updated';
+
+/**
+ * A camera entity's `entity_picture` URL, when the feed is live. When the
+ * camera carries an image version, it is added to the URL, so each new image
+ * is a new `src` and the browser fetches it instead of keeping the old one.
+ */
 function pictureForEntity(hass: HomeAssistant, cameraEntityId: string): string | undefined {
   const entity = stateOf(hass, cameraEntityId);
   if (!isLive(entity)) {
     return undefined;
   }
   const picture = entity.attributes['entity_picture'];
-  return typeof picture === 'string' ? picture : undefined;
+  if (typeof picture !== 'string') {
+    return undefined;
+  }
+  const version = entity.attributes[IMAGE_VERSION_ATTR];
+  if (typeof version !== 'number' && typeof version !== 'string') {
+    return picture;
+  }
+  return `${picture}${picture.includes('?') ? '&' : '?'}v=${encodeURIComponent(String(version))}`;
 }
 
 /** Stacking progress for the hero panel. */
@@ -174,6 +213,11 @@ export interface StackSnapshot {
   readonly droppedFrames?: number;
   readonly exposureSeconds?: number;
   readonly integrationMinutes?: number;
+  /**
+   * When the stacked or dropped frame count last changed (epoch ms). Each new
+   * sub-frame bumps one of them, so a recent value means frames are arriving.
+   */
+  readonly framesChangedAtMs?: number;
 }
 
 /** Plate-solved pointing + framing. */
@@ -236,6 +280,8 @@ export interface PreviewSnapshot {
   readonly liveCameraEntityId: string;
   /** Real-time live-view URL — only while the bridge owns the session. */
   readonly livePicture?: string;
+  /** Filename of the last stack the scope saved — what `picture` shows. */
+  readonly savedFile?: string;
 }
 
 /**
@@ -279,6 +325,7 @@ export function resolve(
       picture: pictureForEntity(hass, cameraEntityId),
       liveCameraEntityId,
       livePicture: pictureForEntity(hass, liveCameraEntityId),
+      savedFile: sensorValue(hass, prefix, sensor.lastSavedFile),
     },
     target: {
       telephotoTarget: sensorValue(hass, prefix, sensor.telephotoTarget),
@@ -293,6 +340,10 @@ export function resolve(
       droppedFrames: numericValue(hass, prefix, sensor.droppedFrames),
       exposureSeconds: numericValue(hass, prefix, sensor.exposure),
       integrationMinutes: numericValue(hass, prefix, sensor.integrationTime),
+      framesChangedAtMs: latest(
+        changedAtMs(hass, prefix, sensor.stackedFrames),
+        changedAtMs(hass, prefix, sensor.droppedFrames),
+      ),
     },
     pointing: {
       altitude: numericValue(hass, prefix, sensor.altitude),
